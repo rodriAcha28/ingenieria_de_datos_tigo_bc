@@ -1,0 +1,21 @@
+# Entornos virtuales
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Datos grandes
+data/raw/*.csv
+data/parquet/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Credenciales
+.env
+credentials.json
+
+# Otros
+.vscode/
+.ipynb_checkpoints/
