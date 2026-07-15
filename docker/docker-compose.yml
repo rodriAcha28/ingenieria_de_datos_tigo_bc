@@ -1,5 +1,6 @@
 services:
-  postgres:
+  # ---------- Postgres del warehouse (bronze/silver/gold) ----------
+  postgres-warehouse:
     image: postgres:15
     environment:
       POSTGRES_USER: dataeng
@@ -8,7 +9,118 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - warehouse_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dataeng"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ---------- Postgres exclusivo de metadata de Airflow ----------
+  postgres-airflow:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow123
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_meta_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ---------- Inicializa la base interna de Airflow y crea el usuario admin ----------
+  airflow-init:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.airflow
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow123@postgres-airflow/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create --username admin --password admin --firstname admin --lastname admin --role Admin --email admin@example.com || true
+
+  # ---------- Interfaz web de Airflow ----------
+  airflow-webserver:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.airflow
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow123@postgres-airflow/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      WAREHOUSE_HOST: postgres-warehouse
+      WAREHOUSE_PORT: 5432
+      WAREHOUSE_DB: warehouse
+      WAREHOUSE_USER: dataeng
+      WAREHOUSE_PASSWORD: dataeng123
+    volumes:
+      - ../dags:/opt/airflow/dags
+      - ../sql:/opt/airflow/sql
+      - ../src:/opt/airflow/src
+      - ../data:/opt/airflow/data
+    ports:
+      - "8080:8080"
+    command: webserver
+    depends_on:
+      - airflow-init
+
+  # ---------- Proceso que ejecuta las tareas de Airflow ----------
+  airflow-scheduler:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.airflow
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow123@postgres-airflow/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      WAREHOUSE_HOST: postgres-warehouse
+      WAREHOUSE_PORT: 5432
+      WAREHOUSE_DB: warehouse
+      WAREHOUSE_USER: dataeng
+      WAREHOUSE_PASSWORD: dataeng123
+    volumes:
+      - ../dags:/opt/airflow/dags
+      - ../sql:/opt/airflow/sql
+      - ../src:/opt/airflow/src
+      - ../data:/opt/airflow/data
+    command: scheduler
+    depends_on:
+      - airflow-init
+
+  # ---------- Jupyter para discovery y análisis ----------
+  jupyter:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.jupyter
+    environment:
+      JUPYTER_TOKEN: dataeng
+      WAREHOUSE_HOST: postgres-warehouse
+      WAREHOUSE_PORT: 5432
+      WAREHOUSE_DB: warehouse
+      WAREHOUSE_USER: dataeng
+      WAREHOUSE_PASSWORD: dataeng123
+    volumes:
+      - ../notebooks:/home/jovyan/work/notebooks
+      - ../data:/home/jovyan/work/data
+      - ../src:/home/jovyan/work/src
+    ports:
+      - "8888:8888"
+    depends_on:
+      postgres-warehouse:
+        condition: service_healthy
 
 volumes:
-  postgres_data:
+  warehouse_data:
+  airflow_meta_data:
