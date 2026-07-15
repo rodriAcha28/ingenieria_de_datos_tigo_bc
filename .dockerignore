@@ -1,0 +1,8 @@
+.git
+data/raw
+data/parquet
+notebooks
+docs
+__pycache__
+*.pyc
+.env
