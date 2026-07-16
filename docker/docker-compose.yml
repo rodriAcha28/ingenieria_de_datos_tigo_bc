@@ -1,10 +1,10 @@
 services:
-  # ---------- Postgres del warehouse (bronze/silver/gold) ----------
+  
   postgres-warehouse:
     image: postgres:15
     environment:
-      POSTGRES_USER: dataeng
-      POSTGRES_PASSWORD: dataeng123
+      POSTGRES_USER: rodrick
+      POSTGRES_PASSWORD: rodrick123
       POSTGRES_DB: warehouse
     ports:
       - "5432:5432"
@@ -12,12 +12,12 @@ services:
       - warehouse_data:/var/lib/postgresql/data
       - ./init-db:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dataeng"]
+      test: ["CMD-SHELL", "pg_isready -U rodrick -d warehouse"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  # ---------- Postgres exclusivo de metadata de Airflow ----------
+  
   postgres-airflow:
     image: postgres:15
     environment:
@@ -32,7 +32,8 @@ services:
       timeout: 5s
       retries: 10
 
-  # ---------- Inicializa la base interna de Airflow y crea el usuario admin ----------
+  
+  
   airflow-init:
     build:
       context: ..
@@ -51,7 +52,6 @@ services:
         airflow db migrate
         airflow users create --username admin --password admin --firstname admin --lastname admin --role Admin --email admin@example.com || true
 
-  # ---------- Interfaz web de Airflow ----------
   airflow-webserver:
     build:
       context: ..
@@ -63,8 +63,8 @@ services:
       WAREHOUSE_HOST: postgres-warehouse
       WAREHOUSE_PORT: 5432
       WAREHOUSE_DB: warehouse
-      WAREHOUSE_USER: dataeng
-      WAREHOUSE_PASSWORD: dataeng123
+      WAREHOUSE_USER: rodrick
+      WAREHOUSE_PASSWORD: rodrick123
     volumes:
       - ../dags:/opt/airflow/dags
       - ../sql:/opt/airflow/sql
@@ -76,7 +76,6 @@ services:
     depends_on:
       - airflow-init
 
-  # ---------- Proceso que ejecuta las tareas de Airflow ----------
   airflow-scheduler:
     build:
       context: ..
@@ -88,8 +87,8 @@ services:
       WAREHOUSE_HOST: postgres-warehouse
       WAREHOUSE_PORT: 5432
       WAREHOUSE_DB: warehouse
-      WAREHOUSE_USER: dataeng
-      WAREHOUSE_PASSWORD: dataeng123
+      WAREHOUSE_USER: rodrick
+      WAREHOUSE_PASSWORD: rodrick123
     volumes:
       - ../dags:/opt/airflow/dags
       - ../sql:/opt/airflow/sql
@@ -99,18 +98,17 @@ services:
     depends_on:
       - airflow-init
 
-  # ---------- Jupyter para discovery y análisis ----------
   jupyter:
     build:
       context: ..
       dockerfile: docker/Dockerfile.jupyter
     environment:
-      JUPYTER_TOKEN: dataeng
+      JUPYTER_TOKEN: rodrick
       WAREHOUSE_HOST: postgres-warehouse
       WAREHOUSE_PORT: 5432
       WAREHOUSE_DB: warehouse
-      WAREHOUSE_USER: dataeng
-      WAREHOUSE_PASSWORD: dataeng123
+      WAREHOUSE_USER: rodrick
+      WAREHOUSE_PASSWORD: rodrick123
     volumes:
       - ../notebooks:/home/jovyan/work/notebooks
       - ../data:/home/jovyan/work/data
