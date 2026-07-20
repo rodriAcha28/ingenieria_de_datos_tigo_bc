@@ -65,6 +65,8 @@ services:
       WAREHOUSE_DB: warehouse
       WAREHOUSE_USER: rodrick
       WAREHOUSE_PASSWORD: rodrick123
+      BRONZE_DATA_PATH: /opt/airflow/data/bronze   
+      SILVER_DATA_PATH: /opt/airflow/data/silver    
     volumes:
       - ../dags:/opt/airflow/dags
       - ../sql:/opt/airflow/sql
@@ -96,6 +98,8 @@ services:
       WAREHOUSE_DB: warehouse
       WAREHOUSE_USER: rodrick
       WAREHOUSE_PASSWORD: rodrick123
+      BRONZE_DATA_PATH: /opt/airflow/data/bronze   
+      SILVER_DATA_PATH: /opt/airflow/data/silver   
     volumes:
       - ../dags:/opt/airflow/dags
       - ../sql:/opt/airflow/sql
@@ -123,6 +127,8 @@ services:
       WAREHOUSE_DB: warehouse
       WAREHOUSE_USER: rodrick
       WAREHOUSE_PASSWORD: rodrick123
+      BRONZE_DATA_PATH: /home/jovyan/work/data/bronze
+      SILVER_DATA_PATH: /home/jovyan/work/data/silver
     volumes:
       - ../notebooks:/home/jovyan/work/notebooks
       - ../data:/home/jovyan/work/data
