@@ -260,3 +260,76 @@ Las banderas de calidad (`valid_age` en `dim_student`, `valid_date_range` en
 filtrar filas en la carga — la decisión de incluir o excluir esos registros
 queda en manos del análisis de negocio o el dashboard final, no se toma de
 forma irreversible en el modelado.
+
+
+## 6 KPIs de negocio (Fase 9)
+
+Implementados como vistas SQL en sql/gold/kpis/, uno por dominio (14 vistas
+en total). vw_sales_cycle_duration excluye el 34.3% de oportunidades con
+close_date < created_at (ver sección de discovery) y reporta el % incluido
+de forma transparente, en vez de ocultar la exclusión o mostrar un promedio
+con duraciones negativas sin sentido.
+
+## 7 Automatización — DAG de Airflow (Fase 10)
+
+El pipeline completo se orquesta con un único DAG (`dags/pipeline_dag.py`),
+con 13 tareas: ingest_bronze → transform_silver → load_staging →
+gold_schema_and_date → 3 ramas paralelas por dominio (university/billing/crm),
+cada una con dimensiones → hechos → KPIs.
+
+Las tres ramas de dominio corren en paralelo porque, según lo confirmado en
+discovery, los tres dominios no comparten datos entre sí — no hay ninguna
+dependencia real que justifique correrlas en secuencia. Las etapas previas
+(ingest_bronze, transform_silver, load_staging) sí son secuenciales, porque
+cada una necesita el resultado completo de la anterior (Silver no puede
+limpiar lo que Bronze no terminó de ingestar, y staging necesita a Silver
+completo antes de subir a Postgres).
+
+El SQL de Gold se ejecuta directo desde Python (psycopg2) leyendo los
+archivos .sql ya montados en /opt/airflow/sql/, sin pasos manuales de copia
+de archivos al contenedor de Postgres — a diferencia del proceso manual usado
+durante el desarrollo, el DAG no depende de docker cp.
+
+Corrida de prueba: 13/13 tareas en success, confirmando ejecución paralela
+real de las tres ramas (mismos timestamps de inicio/fin en las tareas
+equivalentes de cada dominio).
+
+## Exportación de Gold a Parquet (Fase 11)
+
+Se agregó `src/export_gold_parquet.py`, que recorre automáticamente todas
+las tablas del schema `gold` (vía `information_schema`, sin necesidad de
+listarlas a mano) y las exporta a `data/parquet/gold/`. Solo se exportan
+tablas, no las vistas de KPIs (`gold.vw_*`) — esas se recalculan al momento
+de consultarlas, no tiene sentido "congelarlas" en un archivo estático que
+quedaría desactualizado.
+
+Se usó `psycopg2` directo en vez de `sqlalchemy` para conectarse a Postgres,
+a diferencia de otros scripts del proyecto — más simple y evita el tipo de
+conflicto de versiones que ya había aparecido antes con el bug de
+`credits`/`year` en Silver.
+
+Validado con datos reales: 19 tablas (10 dimensiones + `dim_date` + 8
+hechos/bridge), 468,988 filas exportadas — que coincide exacto con el total
+conocido de negocio (446,708) más las 22,280 filas de `dim_date` (calendario,
+no dato de negocio).
+
+## Validación del pipeline (Fase 12)
+
+Se agregó `src/validate_pipeline.py`, que reconcilia el conteo de filas de
+cada una de las 18 tablas a través de las 5 capas del pipeline: raw (CSV) →
+Bronze (Parquet) → Silver (Parquet) → staging (Postgres) → Gold (Postgres).
+
+Cada tabla se marca como:
+- **OK**, si el conteo es idéntico en las 5 capas.
+- **ESPERADO**, si hay una diferencia pero ya está documentada — por ahora
+  solo aplica a `crm_opportunity_contacts`, por el filtro de filas sin FK
+  completa definido en Silver (sección 4.3).
+- **REVISAR**, si hay una diferencia no documentada — señal de pérdida o
+  duplicación de datos en algún punto del pipeline. El script termina con
+  código de error en ese caso, para que una futura tarea de Airflow pueda
+  fallar automáticamente en vez de dejar pasar el problema en silencio.
+
+Resultado con los datos reales del proyecto: 18/18 tablas en estado OK, sin
+ninguna diferencia entre capas — ni siquiera en `crm_opportunity_contacts`,
+que en este dataset no tuvo ninguna fila con FK faltante (el filtro está
+implementado por seguridad, pero no tuvo nada que descartar en la práctica).
