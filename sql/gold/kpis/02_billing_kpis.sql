@@ -41,12 +41,18 @@ JOIN gold.dim_date di ON di.sk_date = inv.sk_date
 JOIN gold.dim_date dd ON dd.sk_date = pay.sk_date;
 
 
--- Suscripciones activas vs finalizadas (churn simple, no de cohorte)
+-- Suscripciones activas vs finalizadas.
+-- IMPORTANTE: el churn se calcula por status = 'cancelled', NO por
+-- presencia de end_date. Se verificó que end_date está poblada incluso en
+-- suscripciones con status='active' (fecha de fin de contrato planificada,
+-- no un indicador de cancelación real) -- ver docs/decisiones.md.
 CREATE OR REPLACE VIEW gold.vw_subscription_churn AS
 SELECT
     COUNT(*) AS total_subscriptions,
-    SUM(CASE WHEN end_date IS NOT NULL THEN 1 ELSE 0 END) AS ended_subscriptions,
-    ROUND(100.0 * SUM(CASE WHEN end_date IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 1) AS churn_rate_pct
+    SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_subscriptions,
+    SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_subscriptions,
+    SUM(CASE WHEN status = 'paused' THEN 1 ELSE 0 END) AS paused_subscriptions,
+    ROUND(100.0 * SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) / COUNT(*), 2) AS churn_rate_pct
 FROM gold.fact_subscriptions;
 
 
