@@ -1,19 +1,3 @@
-"""
-Validación del pipeline (Fase 12) — reconciliación de conteos de filas
-entre las 5 capas: raw (CSV) -> Bronze (Parquet) -> Silver (Parquet)
--> staging (Postgres) -> Gold (Postgres).
-
-El objetivo es detectar pérdida o duplicación de datos en cualquier punto
-del pipeline. Por defecto se espera que el conteo sea IDÉNTICO en las 5
-capas para cada tabla, con una única excepción documentada y esperada:
-
-  crm_opportunity_contacts: en Silver se descartan filas sin
-  opportunity_id o contact_id (tabla puente N:N, ver docs/decisiones.md,
-  sección 4.3). Esto puede hacer que Silver/staging/Gold tengan menos
-  filas que raw/Bronze -- es el comportamiento correcto, no un error.
-
-Cualquier otra diferencia entre capas se reporta como hallazgo a revisar.
-"""
 
 import os
 from pathlib import Path

@@ -1,18 +1,3 @@
-"""
-Silver — limpieza, tipado y estandarización de las 18 tablas de Bronze (Parquet).
-
-Reglas aplicadas aquí provienen directamente del notebook de discovery
-(notebooks/01_discovery_profiling.ipynb). Cada decisión está documentada
-también en docs/decisiones.md.
-
-Principios generales:
-  - Nunca se borra una fila solo porque "se ve rara": se marca con una columna
-    de calidad (_valid_*) y se documenta el % afectado. El análisis de negocio
-    decide luego si excluye esas filas o no.
-  - Los metadatos de linaje de Bronze (_source_file, _source_domain) no pasan
-    a Silver; se reemplazan por un único _bronze_ingested_at para trazabilidad.
-  - Tipos: fechas -> datetime, montos/números -> float, texto -> trim.
-"""
 
 import os
 from pathlib import Path

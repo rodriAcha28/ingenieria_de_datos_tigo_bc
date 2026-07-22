@@ -1,14 +1,3 @@
-"""
-Carga los Parquet de Silver a Postgres, en el schema `staging`.
-
-Esto existe porque Silver vive en Parquet (decisión de arquitectura) pero
-Gold vive en Postgres (decisión del ingeniero encargado). `staging` es el
-puente entre ambos: una copia 1:1 de Silver, sin transformación adicional,
-que el SQL de sql/gold/ usa como fuente para construir dimensiones y hechos.
-
-No confundir con Bronze: staging no tiene metadatos de linaje, es solo un
-espejo de Silver dentro de Postgres para poder usar SQL en la capa Gold.
-"""
 
 import os
 from pathlib import Path

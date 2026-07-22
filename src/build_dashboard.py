@@ -1,19 +1,3 @@
-"""
-Genera un dashboard HTML autocontenido (Fase "plus" — dashboard de KPIs)
-a partir de las vistas gold.vw_* en Postgres.
-
-Por qué HTML/Plotly en vez de Power BI: no se cuenta con licencia/instalación
-de Power BI en el ambiente de desarrollo. Se optó por un dashboard estático
-autocontenido (un solo archivo .html, sin backend ni conexión en vivo) que:
-  - No requiere instalar nada para verlo (se abre en cualquier navegador)
-  - Es fácil de compartir o adjuntar a la entrega
-  - Usa Plotly.js (vía CDN) para gráficos interactivos reales (zoom, hover),
-    no imágenes estáticas
-
-Trade-off documentado: al no tener conexión en vivo, los datos quedan
-"congelados" al momento de generar el archivo. Para refrescarlos, se
-vuelve a correr este script.
-"""
 
 import json
 import os

@@ -1,14 +1,3 @@
-"""
-Exporta la capa Gold (Postgres, schema `gold`) a Parquet, en data/parquet/.
-
-Recorre automáticamente todas las tablas del schema -- no hace falta listar
-cada una a mano, así que si se agrega una tabla/vista nueva a Gold, este
-script la exporta sin necesidad de tocar el código.
-
-Solo exporta tablas (dimensiones y hechos), no las vistas de KPIs
-(gold.vw_*) -- esas se recalculan directo desde las tablas cuando se
-necesitan, no tiene sentido "congelarlas" en un archivo estático.
-"""
 
 import os
 from pathlib import Path
