@@ -333,3 +333,113 @@ Resultado con los datos reales del proyecto: 18/18 tablas en estado OK, sin
 ninguna diferencia entre capas — ni siquiera en `crm_opportunity_contacts`,
 que en este dataset no tuvo ninguna fila con FK faltante (el filtro está
 implementado por seguridad, pero no tuvo nada que descartar en la práctica).
+
+## vw_subscription_churn — corrección de definición (post Fase 13)
+
+La primera versión calculaba churn como "tiene end_date registrada", lo que
+dio 100% (matemáticamente imposible y sin sentido de negocio). Se investigó
+cruzando status vs. presencia de end_date, encontrando que TODAS las
+suscripciones tienen end_date poblada, incluidas las de status='active'
+(11,272 de 15,000) -- confirma que end_date es una fecha de fin de contrato
+planificada, no un indicador de cancelación real.
+
+Corrección: churn se redefine como status='cancelled'. Resultado real:
+14.95% (2,242 de 15,000) -- cifra razonable para un negocio de suscripciones.
+
+Al aplicar el fix apareció además un problema aparte: Postgres no permite
+renombrar columnas de una vista existente con CREATE OR REPLACE VIEW. Hubo
+que hacer DROP VIEW explícito antes de recrearla con las columnas nuevas.
+
+---
+
+## 6. Insights consolidados (Fase 14)
+
+A partir del notebook de análisis, se priorizaron 5 hallazgos por impacto de
+negocio, no por lo interesante que fueran técnicamente:
+
+1. **Cobranza es el problema financiero más urgente**: solo 48.6% de lo
+   facturado se cobra efectivamente.
+2. **Billing depende fuertemente de un solo segmento**: retail concentra
+   ~68-70% del revenue, vulnerabilidad de concentración.
+3. **El ciclo de venta del CRM es sorprendentemente largo** (577.7 días) y
+   solo se pudo medir sobre 65.7% de las oportunidades, por la
+   inconsistencia de fechas ya documentada.
+4. **Más actividad comercial no se traduce en más ventas ganadas** -- el
+   promedio de actividades es casi idéntico entre oportunidades ganadas y
+   perdidas.
+5. **El negocio académico está estable**, sin tendencia de crecimiento ni
+   declive en 4 años de inscripciones.
+
+---
+
+## 7. Dashboard interactivo (plus)
+
+Se construyó con HTML + Plotly.js en vez de Power BI, por no contar con
+licencia/instalación en el ambiente de desarrollo. Es un archivo único
+autocontenido (`dashboards/index.html`, generado por
+`src/build_dashboard.py`), sin backend ni conexión en vivo -- los datos
+quedan "congelados" al momento de generarlo, y se refrescan volviendo a
+correr el script.
+
+Durante las pruebas con capturas reales aparecieron tres bugs, todos
+corregidos:
+
+- **Gráficos en blanco en pestañas no visibles al cargar**: Plotly dibuja
+  con tamaño cero si el contenedor está oculto (`display:none`). Se
+  corrigió dibujando cada gráfico de forma perezosa, solo la primera vez
+  que su pestaña se hace visible.
+- **Ejes contaminados entre gráficos** (fechas apareciendo donde debían ir
+  montos o nombres de etapa): el objeto de configuración de ejes se
+  reutilizaba entre gráficos y Plotly lo modifica en el sitio, contagiando
+  el tipo de eje de un gráfico a otro. Se corrigió generando una
+  configuración nueva e independiente en cada llamada.
+- **Montos serializados como texto en vez de número**: los valores NUMERIC
+  de Postgres llegaban como texto al HTML, lo que empeoraba el problema
+  anterior. Se corrigió convirtiendo explícitamente a float antes de
+  generar el archivo.
+
+También se removió la dependencia de Google Fonts y del CDN de Plotly --
+la librería se incrusta directo en el HTML para que el dashboard funcione
+sin conexión a internet.
+
+---
+
+## 8. Presentación ejecutiva (Fase 15)
+
+Se armó siguiendo la guía oficial de evaluación (no solo insights de
+negocio como se había planeado inicialmente) -- el 70% de la nota depende
+de contenido técnico (problema, arquitectura, herramientas, calidad de
+datos, modelo de datos), así que el PPT cubre eso además de KPIs.
+
+14 diapositivas en total, incluyendo dos de apéndice con fragmentos de
+código reales (el fix del bug de tipado en Silver, y el DDL de una
+dimensión con el patrón de llave subrogada) para tener respaldo visual en
+caso de preguntas técnicas puntuales durante la defensa.
+
+---
+
+## 9. Modelo predictivo (extra, no requerido)
+
+Se agregó como plus, fuera del alcance original del proyecto (ingeniería
+de datos, no ciencia de datos). Objetivo: predecir si una oportunidad de
+venta se gana o se pierde, usando solo variables disponibles mientras la
+oportunidad seguía abierta (sin fuga de datos -- se excluyó explícitamente
+`close_date` y cualquier columna que delatara el resultado).
+
+Regresión logística simple sobre monto, industria, país, revenue anual y
+empleados de la cuenta, y cantidad de actividades. Comparado siempre contra
+un baseline ingenuo (predecir siempre la clase mayoritaria, 61.1%).
+
+**Resultado real:** accuracy 61.5% (+0.4 puntos vs. baseline, no
+significativo) y AUC-ROC 0.476 -- peor que el azar. El modelo no tiene
+poder predictivo real con estas variables. El coeficiente de
+`activity_count` (-0.10) fue pequeño, confirmando estadísticamente el
+hallazgo de discovery de que la cantidad de actividades no predice el
+resultado.
+
+**Conclusión de negocio, no solo técnica:** ninguna variable disponible en
+el CRM actual explica de forma clara por qué se gana o se pierde una
+oportunidad -- esto sugiere que el CRM no está capturando los factores que
+realmente deciden una venta (ej. vendedor asignado, cantidad de tomadores
+de decisión involucrados, información de competencia). Se documenta como
+resultado negativo válido, no se oculta ni se maquilla el número.
