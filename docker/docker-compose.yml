@@ -72,6 +72,7 @@ services:
       - ../sql:/opt/airflow/sql
       - ../src:/opt/airflow/src
       - ../data:/opt/airflow/data
+      - ../dashboards:/opt/airflow/dashboards
     ports:
       - "8080:8080"
     command: webserver
